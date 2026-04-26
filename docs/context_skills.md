@@ -31,6 +31,15 @@ This repo is currently at **“model exists”** stage.
 
 Think of these as the *skills the codebase should gain* (or the implementation work to add) to reach a minimal viable HR system.
 
+## Active Implementation
+
+### 3) CRUD skill (employees module)
+
+Status:
+- **API-first implementation** is in progress using **Django REST Framework (DRF)**
+- **Endpoints being developed**: `GET` (List) and `POST` (Create) for **`/api/employees/`**
+- **Testing skill initiated (RED phase)**: tests are currently **failing** for these endpoints (expected while implementation is underway)
+
 ### 1) Django fundamentals (project hygiene)
 
 - **Environment skill**: predictable dev setup (`.venv`, dependency pinning, run instructions)
@@ -49,19 +58,6 @@ Needed:
 - **Model registration**: register `EmployeeRecord` in `employees/admin.py`
 - **Admin UX**: list display, search fields, filters, ordering
 - **Data integrity**: field validation, constraints
-
-### 3) CRUD skill (employees module)
-
-Minimum features:
-- **Create employee**
-- **List employees** (with pagination)
-- **View details**
-- **Update employee**
-- **Delete/Archive employee**
-
-Implementation options:
-- **Admin-first** (Django admin as the primary interface)
-- **API-first** (Django REST Framework) for integrations/automation
 
 ### 4) URL routing skill (public app entrypoints)
 

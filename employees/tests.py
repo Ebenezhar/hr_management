@@ -3,7 +3,7 @@ from employees.models import Employee
 
 class EmployeeModelTest(TestCase):
     def test_create_employee(self):
-        employee = Employee.objects.create(
+        employee = EmployeeRecord.objects.create(
             full_name="Ebenezhar Balu",
             job_title="Senior Developer",
             country="India",

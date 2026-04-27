@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 import re
 
 from employees.models import EmployeeRecord
+from employees.config import ACCEPTED_COUNTRIES
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
@@ -47,6 +48,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Country may contain only letters, spaces, apostrophes ('), and hyphens (-)."
             )
+        if value not in ACCEPTED_COUNTRIES:
+            raise serializers.ValidationError("Country must be one of the accepted choices.")
         return value
 
     def validate_salary(self, value):

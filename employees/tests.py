@@ -106,6 +106,18 @@ class EmployeeSerializerValidationTests(SimpleTestCase):
         self.assertFalse(s.is_valid())
         self.assertIn("country", s.errors)
 
+    def test_country_accepts_only_configured_choices(self):
+        from employees.config import ACCEPTED_COUNTRIES
+
+        for country in ACCEPTED_COUNTRIES:
+            s = EmployeeSerializer(data=self._valid_payload(country=country))
+            self.assertTrue(s.is_valid(), f"{country!r} should be accepted: {s.errors}")
+
+    def test_country_rejects_unknown_country_even_if_characters_valid(self):
+        s = EmployeeSerializer(data=self._valid_payload(country="Wakanda"))
+        self.assertFalse(s.is_valid())
+        self.assertIn("country", s.errors)
+
     def test_salary_accepts_decimal_and_string(self):
         s1 = EmployeeSerializer(data=self._valid_payload(salary="1234.50"))
         self.assertTrue(s1.is_valid(), s1.errors)

@@ -28,7 +28,7 @@ class EmployeeRecordListCreateApiTests(APITestCase):
 
     def test_create_employee_persists_and_returns_record(self):
         payload = {
-            "full_name": "Ada Lovelace",
+            "full_name": "Adam",
             "job_title": "Engineer",
             "country": "UK",
             "salary": "250000.00",

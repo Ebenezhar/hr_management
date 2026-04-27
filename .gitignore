@@ -1,3 +1,8 @@
+# Database
+*.sqlite3
+*.sqlite
+db.sqlite3
+
 .venv/
 __pycache__/
 *.pyc

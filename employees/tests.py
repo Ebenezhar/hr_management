@@ -32,7 +32,7 @@ class EmployeeRecordListCreateApiTests(APITestCase):
         payload = {
             "full_name": "Adam",
             "job_title": "Engineer",
-            "country": "UK",
+            "country": "United States",
             "salary": "250000.00",
         }
 
@@ -44,6 +44,26 @@ class EmployeeRecordListCreateApiTests(APITestCase):
         self.assertEqual(response.data["job_title"], payload["job_title"])
         self.assertEqual(response.data["country"], payload["country"])
         self.assertIn("id", response.data)
+
+
+class EmployeeSalaryDetailsApiTests(APITestCase):
+    def test_salary_details_for_india_employee_returns_exactly_ten_percent_tax_deduction(self):
+        employee = EmployeeRecord.objects.create(
+            full_name="Priya Sharma",
+            job_title="Software Engineer",
+            country="India",
+            salary=Decimal("100000.00"),
+        )
+
+        response = self.client.get(f"/api/employees/{employee.id}/salary-details/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("tax_deduction", response.data)
+        self.assertEqual(Decimal(str(response.data["tax_deduction"])), Decimal("10000.00"))
+        self.assertEqual(
+            Decimal(str(response.data["tax_deduction"])),
+            employee.salary * Decimal("0.10"),
+        )
 
 
 class EmployeeSerializerValidationTests(SimpleTestCase):

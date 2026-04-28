@@ -5,6 +5,7 @@ from django.urls import reverse  # noqa: F401
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from employees.core_logic import EmployeeTaxDeductionCalculator
 from employees.models import EmployeeRecord
 from employees.serializers import EmployeeSerializer
 
@@ -47,11 +48,11 @@ class EmployeeRecordListCreateApiTests(APITestCase):
 
 
 class EmployeeSalaryDetailsApiTests(APITestCase):
-    def test_salary_details_for_india_employee_returns_exactly_ten_percent_tax_deduction(self):
+    def test_salary_details_for_any_employee_returns_exactly_ten_percent_tax_deduction(self):
         employee = EmployeeRecord.objects.create(
-            full_name="Priya Sharma",
-            job_title="Software Engineer",
-            country="India",
+            full_name="John Carter",
+            job_title="Operations Manager",
+            country="United States",
             salary=Decimal("100000.00"),
         )
 
@@ -59,11 +60,22 @@ class EmployeeSalaryDetailsApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("tax_deduction", response.data)
+        self.assertIn("net_salary", response.data)
         self.assertEqual(Decimal(str(response.data["tax_deduction"])), Decimal("10000.00"))
+        self.assertEqual(Decimal(str(response.data["net_salary"])), Decimal("90000.00"))
         self.assertEqual(
             Decimal(str(response.data["tax_deduction"])),
             employee.salary * Decimal("0.10"),
         )
+
+
+class EmployeeTaxDeductionCoreTests(SimpleTestCase):
+    def test_core_applies_ten_percent_tax_deduction_for_all_employees(self):
+        salary_details = EmployeeTaxDeductionCalculator.build_salary_details(Decimal("250000.00"))
+
+        self.assertEqual(salary_details["salary"], Decimal("250000.00"))
+        self.assertEqual(salary_details["tax_deduction"], Decimal("25000.00"))
+        self.assertEqual(salary_details["net_salary"], Decimal("225000.00"))
 
 
 class EmployeeSerializerValidationTests(SimpleTestCase):

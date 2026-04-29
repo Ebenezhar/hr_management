@@ -5,7 +5,12 @@ from employees.views import EmployeeRecordListCreateAPIView, EmployeeSalaryDetai
 urlpatterns = [
     path("employees/", EmployeeRecordListCreateAPIView.as_view(), name="employee-list-create"),
     path(
-        "employees/<int:employee_id>/salary-details/",
+        "employees//salary-details/",
+        EmployeeSalaryDetailsAPIView.as_view(),
+        {"employee_id": ""},
+    ),
+    path(
+        "employees/<employee_id>/salary-details/",
         EmployeeSalaryDetailsAPIView.as_view(),
         name="employee-salary-details",
     ),

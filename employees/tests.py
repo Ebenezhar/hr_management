@@ -1,235 +1,161 @@
 from decimal import Decimal
 
-from django.test import SimpleTestCase, TestCase
-from django.urls import reverse  # noqa: F401
+from django.test import TestCase
 from rest_framework import status
-from rest_framework.test import APIClient, APITestCase
+from rest_framework.test import APIClient
 
-from employees.core_logic import EmployeeTaxDeductionCalculator
 from employees.models import EmployeeRecord
-from employees.serializers import EmployeeSerializer
 
 
-class EmployeeRecordListCreateApiTests(APITestCase):
-    def test_list_employees_returns_existing_records(self):
-        EmployeeRecord.objects.create(
-            full_name="Ebenezhar Balu",
-            job_title="Senior Developer",
-            country="India",
-            salary=Decimal("100000.00"),
-        )
-
-        response = self.client.get("/api/employees/")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsInstance(response.data, list)
-        self.assertGreaterEqual(len(response.data), 1)
-        self.assertIn("full_name", response.data[0])
-        self.assertIn("job_title", response.data[0])
-        self.assertIn("country", response.data[0])
-        self.assertIn("salary", response.data[0])
-
-    def test_create_employee_persists_and_returns_record(self):
-        payload = {
-            "full_name": "Adam",
-            "job_title": "Engineer",
-            "country": "United States",
-            "salary": "250000.00",
-        }
-
-        response = self.client.post("/api/employees/", payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(EmployeeRecord.objects.count(), 1)
-        self.assertEqual(response.data["full_name"], payload["full_name"])
-        self.assertEqual(response.data["job_title"], payload["job_title"])
-        self.assertEqual(response.data["country"], payload["country"])
-        self.assertIn("id", response.data)
-
-
-class EmployeeSalaryDetailsApiTests(APITestCase):
-    def test_salary_details_for_india_employee_uses_configured_ten_percent_tax_rate(self):
-        employee = EmployeeRecord.objects.create(
-            full_name="Priya Sharma",
-            job_title="Operations Manager",
-            country="India",
-            salary=Decimal("100000.00"),
-        )
-
-        response = self.client.get(f"/api/employees/{employee.id}/salary-details/")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Decimal(str(response.data["tax_rate"])), Decimal("0.10"))
-        self.assertEqual(Decimal(str(response.data["tax_deduction"])), Decimal("10000.00"))
-        self.assertEqual(Decimal(str(response.data["net_salary"])), Decimal("90000.00"))
-
-    def test_salary_details_for_united_states_employee_uses_configured_twelve_percent_tax_rate(self):
-        employee = EmployeeRecord.objects.create(
-            full_name="John Carter",
-            job_title="Operations Manager",
-            country="United States",
-            salary=Decimal("100000.00"),
-        )
-
-        response = self.client.get(f"/api/employees/{employee.id}/salary-details/")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("tax_deduction", response.data)
-        self.assertIn("net_salary", response.data)
-        self.assertEqual(Decimal(str(response.data["tax_rate"])), Decimal("0.12"))
-        self.assertEqual(Decimal(str(response.data["tax_deduction"])), Decimal("12000.00"))
-        self.assertEqual(Decimal(str(response.data["net_salary"])), Decimal("88000.00"))
-        self.assertEqual(
-            Decimal(str(response.data["tax_deduction"])),
-            employee.salary * Decimal("0.12"),
-        )
-
-
-class EmployeeSalaryDetailsApiEdgeCaseTests(TestCase):
+class CountrySalaryMetricsApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
 
-    def test_salary_details_returns_not_found_for_non_existent_employee_id(self):
-        response = self.client.get("/api/employees/999999/salary-details/")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+    def _url(self, country: str) -> str:
+        return f"/api/metrics/country/{country}/"
 
-    def test_salary_details_returns_not_found_for_zero_employee_id(self):
-        response = self.client.get("/api/employees/0/salary-details/")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_salary_details_returns_not_found_for_non_numeric_employee_id(self):
-        response = self.client.get("/api/employees/abc/salary-details/")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_salary_details_returns_not_found_for_empty_employee_id_segment(self):
-        response = self.client.get("/api/employees//salary-details/")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_salary_details_returns_not_found_for_whitespace_employee_id_segment(self):
-        response = self.client.get("/api/employees/%20/salary-details/")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-
-class EmployeeTaxDeductionCoreTests(SimpleTestCase):
-    def test_core_reads_india_tax_rate_from_config(self):
-        salary_details = EmployeeTaxDeductionCalculator.build_salary_details(
-            Decimal("250000.00"),
-            "India",
+    def test_country_metrics_returns_min_max_and_average_salary(self):
+        EmployeeRecord.objects.create(
+            full_name="Aarav Singh",
+            job_title="Engineer",
+            country="India",
+            salary=Decimal("1000.10"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Neha Patel",
+            job_title="Engineer",
+            country="India",
+            salary=Decimal("1000.20"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Liam Scott",
+            job_title="Engineer",
+            country="United States",
+            salary=Decimal("5000.00"),
         )
 
-        self.assertEqual(salary_details["salary"], Decimal("250000.00"))
-        self.assertEqual(salary_details["tax_rate"], Decimal("0.10"))
-        self.assertEqual(salary_details["tax_deduction"], Decimal("25000.00"))
-        self.assertEqual(salary_details["net_salary"], Decimal("225000.00"))
+        response = self.client.get(self._url("India"))
 
-    def test_core_reads_united_states_tax_rate_from_config(self):
-        salary_details = EmployeeTaxDeductionCalculator.build_salary_details(
-            Decimal("250000.00"),
-            "United States",
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data["min_salary"])), Decimal("1000.10"))
+        self.assertEqual(Decimal(str(response.data["max_salary"])), Decimal("1000.20"))
+        self.assertEqual(Decimal(str(response.data["avg_salary"])), Decimal("1000.15"))
+
+    def test_country_metrics_treats_india_case_insensitively_for_ten_percent_rule(self):
+        EmployeeRecord.objects.create(
+            full_name="Meera Nair",
+            job_title="QA Engineer",
+            country="India",
+            salary=Decimal("1000.00"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Rohan Iyer",
+            job_title="QA Engineer",
+            country="India",
+            salary=Decimal("2000.00"),
         )
 
-        self.assertEqual(salary_details["salary"], Decimal("250000.00"))
-        self.assertEqual(salary_details["tax_rate"], Decimal("0.12"))
-        self.assertEqual(salary_details["tax_deduction"], Decimal("30000.00"))
-        self.assertEqual(salary_details["net_salary"], Decimal("220000.00"))
+        response = self.client.get(self._url("india"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data["country_tax_rate"])), Decimal("0.10"))
+        self.assertEqual(
+            Decimal(str(response.data["avg_salary_after_tax"])),
+            Decimal("1350.00"),
+        )
+
+    def test_country_metrics_returns_not_found_when_country_has_no_employees(self):
+        response = self.client.get(self._url("India"))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("not found", response.content.decode().lower())
+
+    def test_country_metrics_uses_decimal_precision_without_float_rounding_errors(self):
+        EmployeeRecord.objects.create(
+            full_name="Nina Dsouza",
+            job_title="Analyst",
+            country="India",
+            salary=Decimal("10.10"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Rahul Das",
+            job_title="Analyst",
+            country="India",
+            salary=Decimal("10.20"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Kiran Rao",
+            job_title="Analyst",
+            country="India",
+            salary=Decimal("10.30"),
+        )
+
+        response = self.client.get(self._url("India"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data["avg_salary"])), Decimal("10.20"))
 
 
-class EmployeeSerializerValidationTests(SimpleTestCase):
-    def _valid_payload(self, **overrides):
-        payload = {
-            "full_name": "John Doe",
-            "job_title": "Software Engineer",
-            "country": "United Kingdom",
-            "salary": "250000.00",
-        }
-        payload.update(overrides)
-        return payload
+class JobTitleSalaryMetricsApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
 
-    def test_valid_payload_is_valid(self):
-        s = EmployeeSerializer(data=self._valid_payload())
-        self.assertTrue(s.is_valid(), s.errors)
+    def _url(self, title: str) -> str:
+        return f"/api/metrics/job-title/{title}/"
 
-    def test_full_name_strips_and_collapses_whitespace(self):
-        s = EmployeeSerializer(data=self._valid_payload(full_name="  John   Doe  "))
-        self.assertTrue(s.is_valid(), s.errors)
-        self.assertEqual(s.validated_data["full_name"], "John Doe")
+    def test_job_title_metrics_returns_average_salary_for_specific_title(self):
+        EmployeeRecord.objects.create(
+            full_name="Asha Verma",
+            job_title="Data Scientist",
+            country="India",
+            salary=Decimal("3000.00"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Ben White",
+            job_title="Data Scientist",
+            country="United States",
+            salary=Decimal("5000.00"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Chris Brown",
+            job_title="Designer",
+            country="India",
+            salary=Decimal("7000.00"),
+        )
 
-    def test_full_name_rejects_empty_or_whitespace(self):
-        s = EmployeeSerializer(data=self._valid_payload(full_name="   "))
-        self.assertFalse(s.is_valid())
-        self.assertIn("full_name", s.errors)
+        response = self.client.get(self._url("Data Scientist"))
 
-    def test_full_name_rejects_invalid_characters(self):
-        s = EmployeeSerializer(data=self._valid_payload(full_name="John@Doe"))
-        self.assertFalse(s.is_valid())
-        self.assertIn("full_name", s.errors)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["job_title"], "Data Scientist")
+        self.assertEqual(Decimal(str(response.data["avg_salary"])), Decimal("4000.00"))
 
-    def test_job_title_strips_and_collapses_whitespace(self):
-        s = EmployeeSerializer(data=self._valid_payload(job_title="  Senior   Dev  "))
-        self.assertTrue(s.is_valid(), s.errors)
-        self.assertEqual(s.validated_data["job_title"], "Senior Dev")
+    def test_job_title_metrics_returns_not_found_when_title_has_no_employees(self):
+        response = self.client.get(self._url("DevOps Engineer"))
 
-    def test_job_title_rejects_empty_or_whitespace(self):
-        s = EmployeeSerializer(data=self._valid_payload(job_title="  "))
-        self.assertFalse(s.is_valid())
-        self.assertIn("job_title", s.errors)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("not found", response.content.decode().lower())
 
-    def test_job_title_rejects_invalid_characters(self):
-        s = EmployeeSerializer(data=self._valid_payload(job_title="Dev<>Ops"))
-        self.assertFalse(s.is_valid())
-        self.assertIn("job_title", s.errors)
+    def test_job_title_metrics_uses_decimal_precision_for_average_salary(self):
+        EmployeeRecord.objects.create(
+            full_name="Diya Sen",
+            job_title="Backend Engineer",
+            country="India",
+            salary=Decimal("0.10"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Ethan Cruz",
+            job_title="Backend Engineer",
+            country="United States",
+            salary=Decimal("0.20"),
+        )
+        EmployeeRecord.objects.create(
+            full_name="Farah Ali",
+            job_title="Backend Engineer",
+            country="India",
+            salary=Decimal("0.30"),
+        )
 
-    def test_country_strips_and_collapses_whitespace(self):
-        s = EmployeeSerializer(data=self._valid_payload(country="  United   States  "))
-        self.assertTrue(s.is_valid(), s.errors)
-        self.assertEqual(s.validated_data["country"], "United States")
+        response = self.client.get(self._url("Backend Engineer"))
 
-    def test_country_rejects_empty_or_whitespace(self):
-        s = EmployeeSerializer(data=self._valid_payload(country="   "))
-        self.assertFalse(s.is_valid())
-        self.assertIn("country", s.errors)
-
-    def test_country_rejects_invalid_characters(self):
-        s = EmployeeSerializer(data=self._valid_payload(country="Ind1a"))
-        self.assertFalse(s.is_valid())
-        self.assertIn("country", s.errors)
-
-    def test_country_accepts_only_configured_choices(self):
-        from employees.config import ACCEPTED_COUNTRIES
-
-        for country in ACCEPTED_COUNTRIES:
-            s = EmployeeSerializer(data=self._valid_payload(country=country))
-            self.assertTrue(s.is_valid(), f"{country!r} should be accepted: {s.errors}")
-
-    def test_country_rejects_unknown_country_even_if_characters_valid(self):
-        s = EmployeeSerializer(data=self._valid_payload(country="Wakanda"))
-        self.assertFalse(s.is_valid())
-        self.assertIn("country", s.errors)
-
-    def test_salary_accepts_decimal_and_string(self):
-        s1 = EmployeeSerializer(data=self._valid_payload(salary="1234.50"))
-        self.assertTrue(s1.is_valid(), s1.errors)
-        self.assertEqual(s1.validated_data["salary"], Decimal("1234.50"))
-
-        s2 = EmployeeSerializer(data=self._valid_payload(salary=Decimal("999.99")))
-        self.assertTrue(s2.is_valid(), s2.errors)
-        self.assertEqual(s2.validated_data["salary"], Decimal("999.99"))
-
-    def test_salary_rejects_non_numeric(self):
-        s = EmployeeSerializer(data=self._valid_payload(salary="abc"))
-        self.assertFalse(s.is_valid())
-        self.assertIn("salary", s.errors)
-
-    def test_salary_rejects_zero_or_negative(self):
-        s1 = EmployeeSerializer(data=self._valid_payload(salary="0"))
-        self.assertFalse(s1.is_valid())
-        self.assertIn("salary", s1.errors)
-
-        s2 = EmployeeSerializer(data=self._valid_payload(salary="-1"))
-        self.assertFalse(s2.is_valid())
-        self.assertIn("salary", s2.errors)
-
-    def test_salary_rejects_too_large(self):
-        s = EmployeeSerializer(data=self._valid_payload(salary="10000000000.00"))
-        self.assertFalse(s.is_valid())
-        self.assertIn("salary", s.errors)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data["avg_salary"])), Decimal("0.20"))

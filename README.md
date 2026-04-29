@@ -1,6 +1,6 @@
 # HR Management (Django)
 
-Small Django project scaffolding for an HR management system. Currently it contains a single app (`employees`) with an `EmployeeRecord` model and uses SQLite for local development.
+Small Django project scaffolding for an HR management system. It contains a single app (`employees`) with an `EmployeeRecord` model, SQLite for local development, and a small REST API (Django REST Framework) under `/api/`.
 
 ## What’s in this repo
 
@@ -12,6 +12,7 @@ Small Django project scaffolding for an HR management system. Currently it conta
 
 - **Python**: (use your local Python in `.venv`)
 - **Django**: 5.2.x (project was generated with Django 5.2.13)
+- **API**: Django REST Framework (DRF)
 - **DB**: SQLite (default Django dev database)
 
 ## Quickstart (Windows / PowerShell)
@@ -22,11 +23,11 @@ If you already have the virtual environment created in `.venv`, activate it:
 .venv\Scripts\Activate.ps1
 ```
 
-Install dependencies (if not installed yet). If you don’t have a `requirements.txt` in this repo yet, install Django directly:
+Install dependencies (if not installed yet). If you don’t have a `requirements.txt` in this repo yet, install Django + DRF directly:
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install "Django>=5.2,<6"
+python -m pip install "Django>=5.2,<6" djangorestframework
 ```
 
 Run migrations and start the server:
@@ -39,6 +40,7 @@ python manage.py runserver
 Open:
 
 - **Admin**: `http://127.0.0.1:8000/admin/`
+- **API base**: `http://127.0.0.1:8000/api/`
 
 Create an admin user if needed:
 
@@ -63,11 +65,57 @@ The corresponding migrations are in `employees/migrations/`:
 
 ## Current routes / UI
 
-At the moment, the only URL configured in `config/urls.py` is:
+`config/urls.py` routes:
 
 - `/admin/`
+- `/api/` (includes `employees/urls.py`)
 
-There are no app views, templates, or APIs wired up yet (`employees/views.py` is still the default stub).
+The API is implemented using DRF `APIView`s in `employees/views.py`.
+
+## API endpoints
+
+All endpoints are prefixed with `/api/`.
+
+### Employee CRUD
+
+- `GET /api/employees/` — list employees
+- `POST /api/employees/` — create employee
+
+Example create:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/employees/" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"full_name\":\"Jane Doe\",\"job_title\":\"Software Engineer\",\"country\":\"India\",\"salary\":\"100000.00\"}"
+```
+
+Example list:
+
+```bash
+curl "http://127.0.0.1:8000/api/employees/"
+```
+
+### Salary details (tax deduction calculation)
+
+- `GET /api/employees/<employee_id>/salary-details/` — returns salary, tax rate, tax deduction, net salary (all 2dp)
+
+Example:
+
+```bash
+curl "http://127.0.0.1:8000/api/employees/1/salary-details/"
+```
+
+### Metrics / reporting
+
+- `GET /api/employees/metrics/country/<country>/` — min/max/avg + tax rate + avg after tax
+- `GET /api/employees/metrics/job-title/<title>/` — average salary for a job title
+
+Examples:
+
+```bash
+curl "http://127.0.0.1:8000/api/employees/metrics/country/India/"
+curl "http://127.0.0.1:8000/api/employees/metrics/job-title/Software%20Engineer/"
+```
 
 ## Tests
 
@@ -88,6 +136,8 @@ hr_management/
     urls.py
     asgi.py
     wsgi.py
+  docs/
+    context_skills.md
   employees/
     migrations/
     models.py
@@ -105,8 +155,8 @@ hr_management/
 If you want this to behave like a real HR system, the usual next increments are:
 
 - **Admin integration**: register `EmployeeRecord` in `employees/admin.py`
-- **App URLs + CRUD**: add `employees/urls.py` and wire it into `config/urls.py`
-- **APIs (optional)**: add DRF CRUD endpoints for integrations/automation
+- **Permissions**: restrict API access (auth, staff-only, roles)
+- **More CRUD**: retrieve/update/delete endpoints, filtering, pagination
 - **Validation & constraints**: salary rules, country normalization, etc.
-- **Auth & permissions**: restrict HR actions to authorized users
-- **Docs**: see `context_skills.md` for a capability/skills checklist
+- **Tests**: fix + expand tests for API and calculation/metrics endpoints
+- **Docs**: see `docs/context_skills.md` for a capability/skills checklist

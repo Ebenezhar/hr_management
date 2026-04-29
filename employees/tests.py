@@ -1,9 +1,9 @@
 from decimal import Decimal
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse  # noqa: F401
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 
 from employees.core_logic import EmployeeTaxDeductionCalculator
 from employees.models import EmployeeRecord
@@ -83,6 +83,31 @@ class EmployeeSalaryDetailsApiTests(APITestCase):
             Decimal(str(response.data["tax_deduction"])),
             employee.salary * Decimal("0.12"),
         )
+
+
+class EmployeeSalaryDetailsApiEdgeCaseTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_salary_details_returns_not_found_for_non_existent_employee_id(self):
+        response = self.client.get("/api/employees/999999/salary-details/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_salary_details_returns_not_found_for_zero_employee_id(self):
+        response = self.client.get("/api/employees/0/salary-details/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_salary_details_returns_not_found_for_non_numeric_employee_id(self):
+        response = self.client.get("/api/employees/abc/salary-details/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_salary_details_returns_not_found_for_empty_employee_id_segment(self):
+        response = self.client.get("/api/employees//salary-details/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_salary_details_returns_not_found_for_whitespace_employee_id_segment(self):
+        response = self.client.get("/api/employees/%20/salary-details/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class EmployeeTaxDeductionCoreTests(SimpleTestCase):

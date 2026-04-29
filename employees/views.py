@@ -90,10 +90,7 @@ class CountrySalaryMetricsAPIView(APIView):
 
         min_salary = (agg["min_salary"] or Decimal("0")).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
         max_salary = (agg["max_salary"] or Decimal("0")).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
-        avg_salary = self._avg_from_total_and_count(
-            agg["total_salary"] or Decimal("0"),
-            int(agg["count"]),
-        )
+        avg_salary = self._avg_from_total_and_count(agg["total_salary"] or Decimal("0"), int(agg["count"]))
 
         tax_key = self._resolve_country_tax_key(resolved_country)
         tax_rate = EmployeeTaxDeductionCalculator.get_tax_rate(tax_key) if tax_key else Decimal("0.00")

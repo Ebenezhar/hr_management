@@ -1,21 +1,29 @@
 from decimal import Decimal, ROUND_HALF_UP
 
+from employees.config import EMPLOYEE_TAX_RATES
 
-TAX_DEDUCTION_RATE = Decimal("0.10")
+
 TWOPLACES = Decimal("0.01")
 
 
 class EmployeeTaxDeductionCalculator:
     @staticmethod
-    def calculate_tax_deduction(salary: Decimal) -> Decimal:
-        return (salary * TAX_DEDUCTION_RATE).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+    def get_tax_rate(country: str) -> Decimal:
+        return EMPLOYEE_TAX_RATES.get(country, Decimal("0.00"))
 
     @classmethod
-    def build_salary_details(cls, salary: Decimal) -> dict[str, Decimal]:
-        tax_deduction = cls.calculate_tax_deduction(salary)
+    def calculate_tax_deduction(cls, salary: Decimal, country: str) -> Decimal:
+        tax_rate = cls.get_tax_rate(country)
+        return (salary * tax_rate).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+
+    @classmethod
+    def build_salary_details(cls, salary: Decimal, country: str) -> dict[str, Decimal]:
+        tax_rate = cls.get_tax_rate(country)
+        tax_deduction = cls.calculate_tax_deduction(salary, country)
         net_salary = (salary - tax_deduction).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
         return {
             "salary": salary.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
+            "tax_rate": tax_rate.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
             "tax_deduction": tax_deduction,
             "net_salary": net_salary,
         }

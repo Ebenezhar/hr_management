@@ -48,7 +48,22 @@ class EmployeeRecordListCreateApiTests(APITestCase):
 
 
 class EmployeeSalaryDetailsApiTests(APITestCase):
-    def test_salary_details_for_any_employee_returns_exactly_ten_percent_tax_deduction(self):
+    def test_salary_details_for_india_employee_uses_configured_ten_percent_tax_rate(self):
+        employee = EmployeeRecord.objects.create(
+            full_name="Priya Sharma",
+            job_title="Operations Manager",
+            country="India",
+            salary=Decimal("100000.00"),
+        )
+
+        response = self.client.get(f"/api/employees/{employee.id}/salary-details/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(str(response.data["tax_rate"])), Decimal("0.10"))
+        self.assertEqual(Decimal(str(response.data["tax_deduction"])), Decimal("10000.00"))
+        self.assertEqual(Decimal(str(response.data["net_salary"])), Decimal("90000.00"))
+
+    def test_salary_details_for_united_states_employee_uses_configured_twelve_percent_tax_rate(self):
         employee = EmployeeRecord.objects.create(
             full_name="John Carter",
             job_title="Operations Manager",
@@ -61,21 +76,37 @@ class EmployeeSalaryDetailsApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("tax_deduction", response.data)
         self.assertIn("net_salary", response.data)
-        self.assertEqual(Decimal(str(response.data["tax_deduction"])), Decimal("10000.00"))
-        self.assertEqual(Decimal(str(response.data["net_salary"])), Decimal("90000.00"))
+        self.assertEqual(Decimal(str(response.data["tax_rate"])), Decimal("0.12"))
+        self.assertEqual(Decimal(str(response.data["tax_deduction"])), Decimal("12000.00"))
+        self.assertEqual(Decimal(str(response.data["net_salary"])), Decimal("88000.00"))
         self.assertEqual(
             Decimal(str(response.data["tax_deduction"])),
-            employee.salary * Decimal("0.10"),
+            employee.salary * Decimal("0.12"),
         )
 
 
 class EmployeeTaxDeductionCoreTests(SimpleTestCase):
-    def test_core_applies_ten_percent_tax_deduction_for_all_employees(self):
-        salary_details = EmployeeTaxDeductionCalculator.build_salary_details(Decimal("250000.00"))
+    def test_core_reads_india_tax_rate_from_config(self):
+        salary_details = EmployeeTaxDeductionCalculator.build_salary_details(
+            Decimal("250000.00"),
+            "India",
+        )
 
         self.assertEqual(salary_details["salary"], Decimal("250000.00"))
+        self.assertEqual(salary_details["tax_rate"], Decimal("0.10"))
         self.assertEqual(salary_details["tax_deduction"], Decimal("25000.00"))
         self.assertEqual(salary_details["net_salary"], Decimal("225000.00"))
+
+    def test_core_reads_united_states_tax_rate_from_config(self):
+        salary_details = EmployeeTaxDeductionCalculator.build_salary_details(
+            Decimal("250000.00"),
+            "United States",
+        )
+
+        self.assertEqual(salary_details["salary"], Decimal("250000.00"))
+        self.assertEqual(salary_details["tax_rate"], Decimal("0.12"))
+        self.assertEqual(salary_details["tax_deduction"], Decimal("30000.00"))
+        self.assertEqual(salary_details["net_salary"], Decimal("220000.00"))
 
 
 class EmployeeSerializerValidationTests(SimpleTestCase):

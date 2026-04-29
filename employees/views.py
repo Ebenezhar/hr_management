@@ -24,11 +24,15 @@ class EmployeeRecordListCreateAPIView(APIView):
 class EmployeeSalaryDetailsAPIView(APIView):
     def get(self, request, employee_id: int):
         employee = get_object_or_404(EmployeeRecord, id=employee_id)
-        salary_details = EmployeeTaxDeductionCalculator.build_salary_details(employee.salary)
+        salary_details = EmployeeTaxDeductionCalculator.build_salary_details(
+            employee.salary,
+            employee.country,
+        )
         return Response(
             {
                 "id": employee.id,
                 "full_name": employee.full_name,
+                "country": employee.country,
                 **salary_details,
             },
             status=status.HTTP_200_OK,
